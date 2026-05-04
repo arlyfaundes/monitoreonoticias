@@ -9,6 +9,8 @@ import json
 import re
 import sys
 import textwrap
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -28,12 +30,42 @@ QUERY = (
     '(school OR schools OR government OR regulator OR parliament OR children OR minors)'
 )
 
-OFFICIAL_OR_RECOGNIZED_DOMAINS = {
+NEWS_SOURCE_DOMAINS = {
     "apnews.com": "Associated Press",
     "reuters.com": "Reuters",
     "bbc.com": "BBC",
     "bbc.co.uk": "BBC",
     "theguardian.com": "The Guardian",
+    "nytimes.com": "The New York Times",
+    "washingtonpost.com": "The Washington Post",
+    "cnn.com": "CNN",
+    "nbcnews.com": "NBC News",
+    "abcnews.go.com": "ABC News",
+    "cbsnews.com": "CBS News",
+    "npr.org": "NPR",
+    "politico.com": "Politico",
+    "axios.com": "Axios",
+    "bloomberg.com": "Bloomberg",
+    "wsj.com": "The Wall Street Journal",
+    "ft.com": "Financial Times",
+    "aljazeera.com": "Al Jazeera",
+    "dw.com": "Deutsche Welle",
+    "france24.com": "France 24",
+    "euronews.com": "Euronews",
+    "skynews.com.au": "Sky News Australia",
+    "abc.net.au": "ABC Australia",
+    "sbs.com.au": "SBS Australia",
+    "smh.com.au": "The Sydney Morning Herald",
+    "theage.com.au": "The Age",
+    "cbc.ca": "CBC",
+    "elpais.com": "El Pais",
+    "latercera.com": "La Tercera",
+    "emol.com": "Emol",
+    "biobiochile.cl": "BioBioChile",
+    "cooperativa.cl": "Radio Cooperativa",
+}
+
+OFFICIAL_SOURCE_DOMAINS = {
     "gov.uk": "GOV.UK",
     "ofcom.org.uk": "Ofcom",
     "esafety.gov.au": "eSafety Commissioner",
@@ -41,6 +73,8 @@ OFFICIAL_OR_RECOGNIZED_DOMAINS = {
     "ec.europa.eu": "Comision Europea",
     "governor.ny.gov": "Gobernacion de Nueva York",
 }
+
+SOURCE_LABELS = NEWS_SOURCE_DOMAINS | OFFICIAL_SOURCE_DOMAINS
 
 
 @dataclass(frozen=True)
@@ -53,7 +87,7 @@ class Article:
     seen_date: str
 
 
-def fetch_gdelt_articles(max_records: int = 50, timespan: str = "3d") -> list[Article]:
+def fetch_gdelt_articles(max_records: int = 50, timespan: str = "3d", retries: int = 3) -> list[Article]:
     params = {
         "query": QUERY,
         "mode": "artlist",
@@ -67,8 +101,21 @@ def fetch_gdelt_articles(max_records: int = 50, timespan: str = "3d") -> list[Ar
         url,
         headers={"User-Agent": "journalism-monitoring-pipeline/1.0"},
     )
-    with urllib.request.urlopen(request, timeout=45) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+
+    payload = {}
+    for attempt in range(1, retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429 and attempt < retries:
+                time.sleep(10 * attempt)
+                continue
+            if exc.code == 429:
+                print("WARNING: GDELT rate limit reached; generating an empty report.", file=sys.stderr)
+                return []
+            raise
 
     articles = []
     for item in payload.get("articles", []):
@@ -88,7 +135,7 @@ def fetch_gdelt_articles(max_records: int = 50, timespan: str = "3d") -> list[Ar
 def score_article(article: Article) -> int:
     text = f"{article.title} {article.domain}".lower()
     score = 0
-    if article.domain in OFFICIAL_OR_RECOGNIZED_DOMAINS:
+    if article.domain in NEWS_SOURCE_DOMAINS:
         score += 40
     for term in ("ban", "restriction", "restrict", "age verification", "under-16", "minor", "children"):
         if term in text:
@@ -99,10 +146,15 @@ def score_article(article: Article) -> int:
     return score
 
 
+def is_identifiable_news_source(article: Article) -> bool:
+    return article.domain in NEWS_SOURCE_DOMAINS
+
+
 def select_articles(articles: list[Article], limit: int = 12) -> list[Article]:
     seen_urls: set[str] = set()
     deduped: list[Article] = []
-    for article in sorted(articles, key=score_article, reverse=True):
+    news_articles = [article for article in articles if is_identifiable_news_source(article)]
+    for article in sorted(news_articles, key=score_article, reverse=True):
         if article.url in seen_urls:
             continue
         seen_urls.add(article.url)
@@ -212,6 +264,7 @@ def build_report(articles: list[Article], run_date: str) -> str:
         "## Alcance y verificacion",
         "",
         "- Datos verificados automaticamente: titulo, enlace, dominio, fecha detectada por GDELT y pais de fuente cuando esta disponible.",
+        "- Filtro de fuentes: solo se incluyen articulos cuyo dominio esta en la lista interna de medios de noticias identificables.",
         "- Interpretaciones: pais/institucion/plataforma/tipo de restriccion se infieren desde titulo, dominio y metadatos; requieren revision editorial antes de publicacion externa.",
         "- Incertidumbres: el script no puede confirmar por si solo el texto completo de cada articulo ni reemplaza la verificacion manual con fuentes primarias.",
         "",
@@ -244,7 +297,7 @@ def build_report(articles: list[Article], run_date: str) -> str:
         lines.append("| Sin resultados suficientes | - | - | - | - | - | - |")
     for article in articles:
         fields = infer_case_fields(article)
-        source = OFFICIAL_OR_RECOGNIZED_DOMAINS.get(article.domain, article.domain or "Fuente no identificada")
+        source = SOURCE_LABELS.get(article.domain, article.domain or "Fuente no identificada")
         lines.append(
             "| {country} | {institution} | {platform} | {restriction_type} | {date} | {source} | [Abrir]({url}) |".format(
                 country=fields["country"],
@@ -262,7 +315,7 @@ def build_report(articles: list[Article], run_date: str) -> str:
         lines.append("No se encontraron resultados suficientemente relevantes en la consulta automatizada.")
     for index, article in enumerate(articles, start=1):
         fields = infer_case_fields(article)
-        source = OFFICIAL_OR_RECOGNIZED_DOMAINS.get(article.domain, article.domain or "Fuente no identificada")
+        source = SOURCE_LABELS.get(article.domain, article.domain or "Fuente no identificada")
         lines.extend(
             [
                 f"### {index}. {article.title}",
