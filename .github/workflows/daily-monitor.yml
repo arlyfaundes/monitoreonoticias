@@ -1,0 +1,32 @@
+name: Daily journalism monitoring
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate daily report
+        run: python scripts/monitor_journalism.py
+
+      - name: Commit generated report and site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/monitoreo-redes-sociales-*.md docs/*.html docs/*.css docs/reports/*.html
+          git diff --cached --quiet || git commit -m "Add daily journalism monitoring report"
+          git push
