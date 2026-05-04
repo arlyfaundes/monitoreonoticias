@@ -8,9 +8,6 @@ on:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   monitor:
     runs-on: ubuntu-latest
@@ -21,17 +18,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Sync with remote
+      - name: Generate daily report
         run: |
-           git config user.name "github-actions[bot]"
-    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 --version
+          python3 scripts/monitor_journalism.py
 
-    git add reports/ docs/
-
-    if git diff --cached --quiet; then
-      echo "No generated changes to commit."
-    else
-      git commit -m "Update daily journalism monitoring report"
-      git pull --rebase origin ${{ github.ref_name }}
-      git push origin HEAD:${{ github.ref_name }}
-    fi
+      - name: Commit generated report and site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/monitoreo-redes-sociales-*.md docs/*.html docs/*.css docs/reports/*.html
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+          else
+            git commit -m "Add daily journalism monitoring report"
+            git pull --rebase origin "$GITHUB_REF_NAME"
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
