@@ -2,3 +2,9 @@ desktop.ini
 ~$*
 __pycache__/
 *.pyc
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
