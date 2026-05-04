@@ -171,7 +171,37 @@ def normalize_date(value: str) -> str:
     return f"{raw[0:4]}-{raw[4:6]}-{raw[6:8]}"
 
 
+def is_under_16_social_media_case(article: Article) -> bool:
+    text = f"{article.title} {article.domain}".lower()
+    age_terms = (
+        "under-16",
+        "under 16",
+        "under sixteen",
+        "menores de 16",
+        "menor de 16",
+        "under-15",
+        "under 15",
+        "under-14",
+        "under 14",
+    )
+    social_terms = ("social media", "social network", "instagram", "facebook", "tiktok", "snapchat", "meta")
+    return any(term in text for term in age_terms) and any(term in text for term in social_terms)
+
+
+def build_under_16_country_counts(articles: list[Article]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for article in articles:
+        if not is_under_16_social_media_case(article):
+            continue
+        country = infer_case_fields(article)["country"]
+        if country == "No identificado automaticamente":
+            continue
+        counts[country] = counts.get(country, 0) + 1
+    return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+
 def build_report(articles: list[Article], run_date: str) -> str:
+    under_16_counts = build_under_16_country_counts(articles)
     lines = [
         "# Monitoreo periodistico: restricciones a redes sociales y dispositivos digitales",
         "",
@@ -185,11 +215,30 @@ def build_report(articles: list[Article], run_date: str) -> str:
         "- Interpretaciones: pais/institucion/plataforma/tipo de restriccion se infieren desde titulo, dominio y metadatos; requieren revision editorial antes de publicacion externa.",
         "- Incertidumbres: el script no puede confirmar por si solo el texto completo de cada articulo ni reemplaza la verificacion manual con fuentes primarias.",
         "",
+        "## Resumen visual: menores de 16 anos",
+        "",
+        f"Total de paises detectados con senales de prohibicion o restriccion de redes sociales para menores de 16 anos: {len(under_16_counts)}.",
+        "",
+        "| Pais / region | Casos detectados | Grafico |",
+        "|---|---:|---|",
+    ]
+
+    if not under_16_counts:
+        lines.append("| Sin resultados suficientemente claros | 0 | - |")
+    for country, count in under_16_counts.items():
+        lines.append(f"| {country} | {count} | {'#' * count} |")
+
+    lines.extend(
+        [
+            "",
+            "Nota: este grafico cuenta paises detectados en los articulos seleccionados por el monitoreo automatizado. Requiere verificacion editorial antes de afirmarlo como estado legal vigente.",
+            "",
         "## Tabla base",
         "",
         "| Pais / region | Institucion | Plataforma | Tipo de restriccion | Fecha | Fuente | Enlace |",
         "|---|---|---|---|---|---|---|",
-    ]
+        ]
+    )
 
     if not articles:
         lines.append("| Sin resultados suficientes | - | - | - | - | - | - |")
