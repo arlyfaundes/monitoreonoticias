@@ -26,7 +26,8 @@ jobs:
       - name: Generate daily report
         run: python scripts/monitor_journalism.py
 
-     - name: Commit generated report and site
+     - name: 
+     Commit generated report and site
   run: |
     git config user.name "github-actions[bot]"
     git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -35,8 +36,3 @@ jobs:
     git add .
     git commit -m "Update report" || echo "No changes"
     git push origin main
-          else
-            git commit -m "Add daily journalism monitoring report"
-            git pull --rebase origin "$GITHUB_REF_NAME"
-            git push origin "HEAD:$GITHUB_REF_NAME"
-          fi
