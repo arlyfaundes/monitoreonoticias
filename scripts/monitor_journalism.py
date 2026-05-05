@@ -354,6 +354,26 @@ def build_report(articles: list[Article], run_date: str) -> str:
 def markdown_to_html(markdown_text: str, title: str) -> str:
     body_parts: list[str] = []
     in_table = False
+
+    def render_inline(value: str) -> str:
+        escaped = html.escape(value)
+        escaped = re.sub(
+            r"\[([^\]]+)\]\((https?://[^)\s]+)\)",
+            lambda match: (
+                f'<a href="{html.escape(match.group(2), quote=True)}" '
+                f'target="_blank" rel="noopener noreferrer">{match.group(1)}</a>'
+            ),
+            escaped,
+        )
+        return re.sub(
+            r"(?<![\"=])(https?://[^\s<]+)",
+            lambda match: (
+                f'<a href="{html.escape(match.group(1), quote=True)}" '
+                f'target="_blank" rel="noopener noreferrer">{match.group(1)}</a>'
+            ),
+            escaped,
+        )
+
     for raw_line in markdown_text.splitlines():
         line = raw_line.rstrip()
         if not line:
@@ -362,7 +382,7 @@ def markdown_to_html(markdown_text: str, title: str) -> str:
                 in_table = False
             continue
         if line.startswith("|") and line.endswith("|"):
-            cells = [html.escape(cell.strip()) for cell in line.strip("|").split("|")]
+            cells = [render_inline(cell.strip()) for cell in line.strip("|").split("|")]
             if set(cells[0]) == {"-"}:
                 continue
             if not in_table:
@@ -381,9 +401,9 @@ def markdown_to_html(markdown_text: str, title: str) -> str:
         elif line.startswith("### "):
             body_parts.append(f"<h3>{html.escape(line[4:])}</h3>")
         elif line.startswith("- "):
-            body_parts.append(f"<p class=\"bullet\">{html.escape(line)}</p>")
+            body_parts.append(f"<p class=\"bullet\">{render_inline(line)}</p>")
         else:
-            body_parts.append(f"<p>{html.escape(line)}</p>")
+            body_parts.append(f"<p>{render_inline(line)}</p>")
     if in_table:
         body_parts.append("</tbody></table>")
 
