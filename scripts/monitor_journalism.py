@@ -532,10 +532,6 @@ def run_pipeline() -> int:
     report_text = build_report(articles, run_date)
     report_name = f"monitoreo-redes-sociales-{run_date}.md"
     report_path = REPORTS_DIR / report_name
-    if report_path.exists():
-        stamp = datetime.now().strftime("%H%M")
-        report_name = f"monitoreo-redes-sociales-{run_date}-{stamp}.md"
-        report_path = REPORTS_DIR / report_name
     report_path.write_text(report_text, encoding="utf-8")
     publish_report(report_text, report_name)
     import_existing_reports()
