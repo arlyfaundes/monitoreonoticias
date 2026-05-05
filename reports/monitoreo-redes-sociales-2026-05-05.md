@@ -25,30 +25,11 @@ Nota: este grafico cuenta paises detectados en los articulos seleccionados por e
 
 | Pais / region | Institucion | Plataforma | Tipo de restriccion | Fecha | Fuente | Enlace |
 |---|---|---|---|---|---|---|
-| Canada | No identificado automaticamente | Redes sociales / dispositivos digitales | Restriccion o debate regulatorio | 2026-05-03 | CBC | [Abrir](https://www.cbc.ca/news/canada/kitchener-waterloo/substance-use-screen-time-guelph-wellington-dufferin-schools-9.7182945) |
 | Reino Unido | Gobierno / regulador | Redes sociales / dispositivos digitales | Restriccion o debate regulatorio | 2026-05-03 | Deutsche Welle | [Abrir](https://www.dw.com/pl/skutki-wojennej-traumy-mobbing-w-ukrai%C5%84skich-szko%C5%82ach/a-77022693) |
 
 ## Casos seleccionados
 
-### 1. Guelph - area school boards hosting panel discussion on substance use and screen time in schools
-
-- Pais / region: Canada
-- Institucion: No identificado automaticamente
-- Plataforma: Redes sociales / dispositivos digitales
-- Tipo de restriccion: Restriccion o debate regulatorio
-- Fecha detectada: 2026-05-03
-- Fuente: CBC
-- Enlace: https://www.cbc.ca/news/canada/kitchener-waterloo/substance-use-screen-time-guelph-wellington-dufferin-schools-9.7182945
-
-**Resumen en espanol:** El articulo reporta un caso relacionado con limites, restricciones o supervision sobre redes sociales o dispositivos digitales: Guelph - area school boards hosting panel discussion on substance use and screen time in schools.
-
-**Datos verificados:** titulo, URL, dominio y fecha detectada por GDELT.
-
-**Interpretacion:** clasificacion editorial preliminar generada automaticamente.
-
-**Incertidumbres:** revisar fuente primaria o texto completo antes de usar como evidencia final.
-
-### 2. Skutki wojennej traumy . Mobbing w ukraińskich szkołach
+### 1. Skutki wojennej traumy . Mobbing w ukraińskich szkołach
 
 - Pais / region: Reino Unido
 - Institucion: Gobierno / regulador

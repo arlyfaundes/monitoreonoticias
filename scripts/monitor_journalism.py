@@ -150,10 +150,22 @@ def is_identifiable_news_source(article: Article) -> bool:
     return article.domain in NEWS_SOURCE_DOMAINS
 
 
+def has_identified_case_fields(article: Article) -> bool:
+    fields = infer_case_fields(article)
+    return (
+        fields["country"] != "No identificado automaticamente"
+        and fields["institution"] != "No identificado automaticamente"
+    )
+
+
 def select_articles(articles: list[Article], limit: int = 12) -> list[Article]:
     seen_urls: set[str] = set()
     deduped: list[Article] = []
-    news_articles = [article for article in articles if is_identifiable_news_source(article)]
+    news_articles = [
+        article
+        for article in articles
+        if is_identifiable_news_source(article) and has_identified_case_fields(article)
+    ]
     for article in sorted(news_articles, key=score_article, reverse=True):
         if article.url in seen_urls:
             continue
@@ -410,6 +422,48 @@ def markdown_to_html(markdown_text: str, title: str) -> str:
     return HTML_TEMPLATE.format(title=html.escape(title), body="\n".join(body_parts))
 
 
+def remove_unidentified_cases(markdown_text: str) -> str:
+    lines = markdown_text.splitlines()
+    cleaned: list[str] = []
+    case_block: list[str] = []
+    case_index = 1
+    in_case_block = False
+
+    def keep_case(block: list[str]) -> bool:
+        return "No identificado automaticamente" not in "\n".join(block)
+
+    for line in lines:
+        if line.startswith("### "):
+            if case_block and keep_case(case_block):
+                case_block[0] = re.sub(r"^### \d+\.", f"### {case_index}.", case_block[0])
+                cleaned.extend(case_block)
+                case_index += 1
+            case_block = [line]
+            in_case_block = True
+            continue
+        if in_case_block:
+            if line.startswith("## "):
+                if case_block and keep_case(case_block):
+                    case_block[0] = re.sub(r"^### \d+\.", f"### {case_index}.", case_block[0])
+                    cleaned.extend(case_block)
+                    case_index += 1
+                case_block = []
+                in_case_block = False
+                cleaned.append(line)
+            else:
+                case_block.append(line)
+            continue
+        if line.startswith("|") and "No identificado automaticamente" in line:
+            continue
+        cleaned.append(line)
+
+    if case_block and keep_case(case_block):
+        case_block[0] = re.sub(r"^### \d+\.", f"### {case_index}.", case_block[0])
+        cleaned.extend(case_block)
+
+    return "\n".join(cleaned).rstrip() + "\n"
+
+
 HTML_TEMPLATE = """<!doctype html>
 <html lang="es">
 <head>
@@ -540,6 +594,8 @@ def import_existing_reports() -> None:
     DOCS_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     for markdown_path in sorted(REPORTS_DIR.glob("monitoreo-redes-sociales-*.md")):
         markdown_text = markdown_path.read_text(encoding="utf-8")
+        markdown_text = remove_unidentified_cases(markdown_text)
+        markdown_path.write_text(markdown_text, encoding="utf-8")
         publish_report(markdown_text, markdown_path.name)
     build_index()
 
